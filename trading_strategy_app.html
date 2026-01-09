@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Strategy Testing App - Cloud Sync</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- React & Other Libraries -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 4.2
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCqB9Ju-kPeW3Rzrk_Xl2xtaoHDLpN_uEk",
+  authDomain: "strategytracker-b2e05.firebaseapp.com",
+  projectId: "strategytracker-b2e05",
+  storageBucket: "strategytracker-b2e05.firebasestorage.app",
+  messagingSenderId: "296098181492",
+  appId: "1:296098181492:web:963a0b6abb0bb4afe9bc21",
+  measurementId: "G-TNTKD9S0KD"
+};
+      
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // SVG Icons
+        const Download = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>);
+        const Plus = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
+        const Trash = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
+        const TrendingUp = () => (<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>);
+        const BarChart = () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>);
+        const Save = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>);
+        const Search = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>);
+        const Cloud = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>);
+        const LogOut = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>);
+        const User = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>);
+
+        function LoginForm({ onLogin }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [isSignUp, setIsSignUp] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+
+                try {
+                    if (isSignUp) {
+                        await auth.createUserWithEmailAndPassword(email, password);
+                    } else {
+                        await auth.signInWithEmailAndPassword(email, password);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+                        <div className="text-center mb-6">
+                            <div className="inline-block p-3 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full mb-4">
+                                <TrendingUp />
+                            </div>
+                            <h1 className="text-3xl font-bold text-slate-800">Trading Strategy App</h1>
+                            <p className="text-slate-600 mt-2">Cloud-synced across all devices</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="you@example.com"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all disabled:opacity-50"
+                            >
+                                {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsSignUp(!isSignUp)}
+                                className="w-full text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                                {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 pt-6 border-t border-slate-200">
+                            <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+                                <Cloud />
+                                <span>Your data syncs across all devices</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function TradingStrategyApp() {
+            const [user, setUser] = useState(null);
+            const [rows, setRows] = useState([]);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterStage, setFilterStage] = useState('All');
+            const [filterStatus, setFilterStatus] = useState('All');
+            const [showStats, setShowStats] = useState(false);
+            const [syncStatus, setSyncStatus] = useState('synced');
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+                return unsubscribe;
+            }, []);
+
+            useEffect(() => {
+                if (user) {
+                    loadDataFromFirestore();
+                }
+            }, [user]);
+
+            const loadDataFromFirestore = async () => {
+                if (!user) return;
+
+                try {
+                    setSyncStatus('syncing');
+                    const snapshot = await db.collection('users').doc(user.uid).collection('strategies').get();
+                    const strategies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setRows(strategies);
+                    setSyncStatus('synced');
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    setSyncStatus('error');
+                }
+            };
+
+            const saveToFirestore = async (updatedRows) => {
+                if (!user) return;
+
+                try {
+                    setSyncStatus('syncing');
+                    const batch = db.batch();
+                    
+                    updatedRows.forEach((row) => {
+                        const docRef = db.collection('users').doc(user.uid).collection('strategies').doc(String(row.id));
+                        batch.set(docRef, row);
+                    });
+
+                    await batch.commit();
+                    setSyncStatus('synced');
+                } catch (error) {
+                    console.error('Error saving data:', error);
+                    setSyncStatus('error');
+                }
+            };
+
+            const addRow = () => {
+                const newRow = {
+                    id: Date.now(),
+                    stage: '',
+                    component: '',
+                    criteria: '',
+                    testDate: '',
+                    whyTesting: '',
+                    howTesting: '',
+                    results: '',
+                    status: 'Pending'
+                };
+                const updatedRows = [...rows, newRow];
+                setRows(updatedRows);
+                saveToFirestore(updatedRows);
+            };
+
+            const deleteRow = async (id) => {
+                if (!confirm('Delete this strategy?')) return;
+                
+                try {
+                    setSyncStatus('syncing');
+                    await db.collection('users').doc(user.uid).collection('strategies').doc(String(id)).delete();
+                    const updatedRows = rows.filter(row => row.id !== id);
+                    setRows(updatedRows);
+                    setSyncStatus('synced');
+                } catch (error) {
+                    console.error('Error deleting:', error);
+                    setSyncStatus('error');
+                }
+            };
+
+            const updateRow = (id, field, value) => {
+                const updatedRows = rows.map(row => 
+                    row.id === id ? { ...row, [field]: value } : row
+                );
+                setRows(updatedRows);
+                saveToFirestore(updatedRows);
+            };
+
+            const handleLogout = async () => {
+                await auth.signOut();
+            };
+
+            const downloadExcel = () => {
+                const worksheet_data = [
+                    ['Stage/Level', 'Component', 'Criteria', 'Test Date', 'Why Testing', 'How Testing', 'Results', 'Status'],
+                    ...filteredRows.map(row => [
+                        row.stage, row.component, row.criteria, row.testDate,
+                        row.whyTesting, row.howTesting, row.results, row.status
+                    ])
+                ];
+
+                const ws = XLSX.utils.aoa_to_sheet(worksheet_data);
+                ws['!cols'] = [
+                    { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 12 },
+                    { wch: 30 }, { wch: 30 }, { wch: 25 }, { wch: 12 }
+                ];
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Trading Strategies");
+                XLSX.writeFile(wb, `Trading_Strategies_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+                        <div className="text-white text-xl">Loading...</div>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                return <LoginForm onLogin={setUser} />;
+            }
+
+            const filteredRows = rows.filter(row => {
+                const matchesSearch = row.component?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                      row.stage?.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesStage = filterStage === 'All' || row.stage === filterStage;
+                const matchesStatus = filterStatus === 'All' || row.status === filterStatus;
+                return matchesSearch && matchesStage && matchesStatus;
+            });
+
+            const stats = {
+                total: rows.length,
+                passed: rows.filter(r => r.status === 'Passed').length,
+                failed: rows.filter(r => r.status === 'Failed').length,
+                pending: rows.filter(r => r.status === 'Pending').length
+            };
+
+            const getStatusColor = (status) => {
+                switch(status) {
+                    case 'Passed': return 'bg-green-100 text-green-800 border-green-300';
+                    case 'Failed': return 'bg-red-100 text-red-800 border-red-300';
+                    case 'Pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                    default: return 'bg-gray-100 text-gray-800 border-gray-300';
+                }
+            };
+
+            const getSyncStatusColor = () => {
+                switch(syncStatus) {
+                    case 'synced': return 'text-green-600';
+                    case 'syncing': return 'text-blue-600';
+                    case 'error': return 'text-red-600';
+                    default: return 'text-gray-600';
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4 md:p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-t-lg p-6 shadow-xl">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <TrendingUp />
+                                    <div>
+                                        <h1 className="text-2xl md:text-3xl font-bold text-white">Trading Strategy App</h1>
+                                        <p className="text-emerald-100 mt-1 text-sm flex items-center gap-2">
+                                            <Cloud />
+                                            <span className={getSyncStatusColor()}>
+                                                {syncStatus === 'synced' ? '✓ Synced' : syncStatus === 'syncing' ? 'Syncing...' : 'Sync Error'}
+                                            </span>
+                                            <span className="text-emerald-200 mx-2">•</span>
+                                            <User />
+                                            {user.email}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    <button onClick={() => setShowStats(!showStats)} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 text-sm">
+                                        <BarChart /> Stats
+                                    </button>
+                                    <button onClick={downloadExcel} className="flex items-center gap-2 bg-white text-emerald-700 px-4 py-2 rounded-lg font-semibold hover:bg-emerald-50 text-sm">
+                                        <Download /> Export
+                                    </button>
+                                    <button onClick={handleLogout} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 text-sm">
+                                        <LogOut /> Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {showStats && (
+                            <div className="bg-white p-6 shadow-lg border-x">
+                                <h2 className="text-xl font-bold text-slate-800 mb-4">Strategy Overview</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border">
+                                        <p className="text-sm text-blue-700 font-medium">Total</p>
+                                        <p className="text-3xl font-bold text-blue-900">{stats.total}</p>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border">
+                                        <p className="text-sm text-green-700 font-medium">Passed</p>
+                                        <p className="text-3xl font-bold text-green-900">{stats.passed}</p>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border">
+                                        <p className="text-sm text-red-700 font-medium">Failed</p>
+                                        <p className="text-3xl font-bold text-red-900">{stats.failed}</p>
+                                    </div>
+                                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border">
+                                        <p className="text-sm text-yellow-700 font-medium">Pending</p>
+                                        <p className="text-3xl font-bold text-yellow-900">{stats.pending}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-slate-100 p-4 shadow-lg border-x">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                                        <Search />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Search strategies..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="px-4 py-2 border border-slate-300 rounded-lg">
+                                    <option value="All">All Stages</option>
+                                    <option value="Backtesting">Backtesting</option>
+                                    <option value="Paper Trading">Paper Trading</option>
+                                    <option value="Live Trading">Live Trading</option>
+                                </select>
+                                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-slate-300 rounded-lg">
+                                    <option value="All">All Status</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Passed">Passed</option>
+                                    <option value="Failed">Failed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-b-lg shadow-xl overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Stage</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Component</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Criteria</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Date</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Why</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">How</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Results</th>
+                                            <th className="px-3 py-3 text-left text-xs font-semibold">Status</th>
+                                            <th className="px-3 py-3 text-center text-xs font-semibold">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredRows.map((row, index) => (
+                                            <tr key={row.id} className={`border-b ${index % 2 === 0 ? 'bg-slate-50' : 'bg-white'} hover:bg-blue-50`}>
+                                                <td className="px-3 py-2">
+                                                    <select value={row.stage || ''} onChange={(e) => updateRow(row.id, 'stage', e.target.value)} className="w-full px-2 py-1 border rounded text-xs">
+                                                        <option value="">Select...</option>
+                                                        <option value="Backtesting">Backtesting</option>
+                                                        <option value="Paper Trading">Paper Trading</option>
+                                                        <option value="Live Trading">Live Trading</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="text" value={row.component || ''} onChange={(e) => updateRow(row.id, 'component', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" placeholder="Strategy" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="text" value={row.criteria || ''} onChange={(e) => updateRow(row.id, 'criteria', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="date" value={row.testDate || ''} onChange={(e) => updateRow(row.id, 'testDate', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="text" value={row.whyTesting || ''} onChange={(e) => updateRow(row.id, 'whyTesting', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="text" value={row.howTesting || ''} onChange={(e) => updateRow(row.id, 'howTesting', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input type="text" value={row.results || ''} onChange={(e) => updateRow(row.id, 'results', e.target.value)} className="w-full px-2 py-1 border rounded text-xs" />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <select value={row.status || 'Pending'} onChange={(e) => updateRow(row.id, 'status', e.target.value)} className={`w-full px-2 py-1 border rounded text-xs font-medium ${getStatusColor(row.status)}`}>
+                                                        <option value="Pending">Pending</option>
+                                                        <option value="Passed">Passed</option>
+                                                        <option value="Failed">Failed</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                    <button onClick={() => deleteRow(row.id)} className="text-red-600 hover:text-red-800">
+                                                        <Trash />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="p-4 bg-slate-100 border-t flex justify-between items-center">
+                                <button onClick={addRow} className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-emerald-700 hover:to-teal-700 text-sm">
+                                    <Plus /> Add Strategy
+                                </button>
+                                <p className="text-sm text-slate-600">Showing {filteredRows.length} of {rows.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<TradingStrategyApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
